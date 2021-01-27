@@ -1,0 +1,566 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.7.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+import pandas as pd
+import numpy as np
+import warnings
+warnings.resetwarnings = True
+```
+
+```{python}
+df = pd.read_csv('health care diabetes.csv')
+df.shape
+```
+
+# Initial data exploration
+
+
+1.1 Perform descriptive analysis. Understand the variables and their corresponding values. On the columns below, a value of zero does not make sense and thus indicates missing value:
+
+```{python}
+df.describe()
+```
+
+Minimum values for Glucose, Blood Pressure, Skin Thickness, Insulin, BMI are 0. This are not correct values and need to be changes
+
+```{python}
+df.info()
+```
+
+There are no empty/null values
+
+```{python}
+df.dtypes
+```
+
+All the values are numeric. Outcome is the Target value and is categorical
+
+```{python}
+df['Outcome'].value_counts()
+```
+
+Clearly an unbalanced dataset. No of patients with Diabetes is almost half of non daibetic
+
+
+# Data preparation and Visualizations
+
+
+1.2. Visually explore these variables using histograms. Treat the missing values accordingly.
+
+```{python}
+# Replacing incorrect values for Glucose, Blood Pressure, Skin Thickness, Insulin, BMI with correct values 
+# Statistically Calculated
+# Replacing all the 0 values for above mentioned column with medians for each of them
+median_glucose = np.median(np.array(df.loc[df['Glucose'] != 0.0]))
+median_bp = np.median(np.array(df.loc[df['BloodPressure'] != 0.0]))
+median_skinThickness = np.median(np.array(df.loc[df['SkinThickness'] != 0.0]))
+median_insulin = np.median(np.array(df.loc[df['Insulin'] != 0.0]))
+median_bmi = np.median(np.array(df.loc[df['BMI'] != 0.0]))
+
+df.loc[df['Glucose']== 0, 'Glucose'] = median_glucose
+df.loc[df['BloodPressure']== 0, 'BloodPressure'] = median_bp
+df.loc[df['SkinThickness']== 0, 'SkinThickness'] = median_skinThickness
+df.loc[df['Insulin']== 0, 'Insulin'] = median_bmi
+df.loc[df['BMI']== 0, 'BMI'] = median_bmi
+```
+
+```{python}
+df.describe()
+```
+
+```{python}
+# Understanding the distribution of each feature through histogram
+import math
+import plotly.express as px
+for i in df.columns[0:-1]:
+    counts, bins = np.histogram(df[i], bins=range(math.floor(min(df[i])), math.ceil(max(df[i])), math.ceil(max(df[i])/10)))
+    bins = 0.5 * (bins[:-1] + bins[1:])
+    fig = px.bar(x=bins, y=counts, labels={'x': i , 'y':'Count'})
+    fig.show()
+```
+
+```{python active="", eval=FALSE}
+Pregnancies : Majority are between 0-2 and the count gradually goes down with increase in number of pregnancy
+Glucose :  581 females have normal level(71-140), 11 of them with low level(31-70) and remaining 147 with high level
+Blood Pressure : The numbers are takes as Diastolic figures for BP. Low BP (21-60) = 193, Normal BP(61-80) = 515 and Hign BP(81-110)= 59
+Skin Thickness : The normal range is (21-30) = 578 and thin (<=20) = 59 and thick (>=31) = 130
+Insulin :  Normal range (30-200) = 663 , high level(>200) = 97
+BMI : Majority of the patients lie in the in range of 21-40 and few above 40 and few below 20
+Diabetic Pedigree function : 717 patient are between (0-1) and remaining above 1
+Age : Number of patient are decreasing with increase in Age. Maximum lie in between (20 and 30)
+
+```
+
+```{python}
+# Generating Distribution plot for each feature
+import plotly.figure_factory as ff
+for i in df.columns[0:-1]:
+    fig = ff.create_distplot([df[i]], [i])
+    fig.show()
+```
+
+2.1. Check the balance of the data by plotting the count of outcomes by their value. Describe your findings and plan future course of action.
+
+```{python}
+a, b = df['Outcome'].value_counts()
+fig = px.pie(values = [a,b],labels=['Target 0', 'Target 1'], names=['Target 0', 'Target 1']
+             ,title='Distribution of Outcome')
+fig.show()
+```
+
+```{python active="", eval=FALSE}
+ Unbalanced dataset with 65.1% Outcome = 0 and 34.9% Outcome = 1 
+```
+
+2.2. Create scatter charts between the pair of variables to understand the relationships. Describe your findings.
+
+```{python}
+# Finding all combinations of columns in df
+import plotly.express as px
+from itertools import combinations
+comb = [comb for comb in combinations(list(df.columns), 2)]
+
+# Ploting graphs for each combination
+for i in comb:
+    p = str(str(i[0])+' vs '+ str(i[1]))
+    fig = px.scatter(df, x=df[i[0]], y=df[i[1]])
+    fig.update_layout(title=p,xaxis_title=i[0],yaxis_title=i[1])
+    fig.show()
+    
+```
+
+2.3. Perform correlation analysis. Visually explore it using a heat map.
+
+```{python}
+import cufflinks as cf
+import plotly.offline
+cf.go_offline()
+cf.set_config_file(offline=False, world_readable=True)
+df.corr().iplot(kind='heatmap',colorscale="Blues", title="Feature Correlation Matrix")
+```
+
+```{python active="", eval=FALSE}
+Age and Pregnancy are correlated with coefficeint of 0.5
+Gluscose and Daibetes (Outcome) are also correlated with coefficeint 0.47
+BMI and SkinThickness are correlated with 0.54 coefficeint
+Rest of the feature are mildly correlated with each other and are not very significant
+```
+
+3.1. Devise strategies for model building. It is important to decide the right validation framework. Express your thought process.
+
+
+ Strategy going forward :
+    1. This problem comes under Classification as the Outcome(Target value) is
+        Boolean(0 and 1)
+    2. Algorithms to be looked into will be Decision Trees, Random Forests, SVMs 
+        and Logistic Regression.
+    3. Since dataset is small Cross validation techniques to be used and dataset will be 
+        split into Train and Test data in the ratio (80:20)
+    4. Dataset is unbalanced, hence validation mertrics wont be accuracy. 
+        Performance of the model will be based on Recall and Precision.
+    5. Base model for performace check will be KNN algorithm.
+    6. Best performing algorithm from 4 will make the final model.
+
+
+# Building Models
+
+```{python}
+# data set is skewed and hence the model will not be accurate with the same data
+# Skew has to be removed and then modelling .
+```
+
+```{python}
+# check skew and remove
+def check_skew(df,all_cols):
+    make_transform = pd.DataFrame(columns=["Column","Skew","Kurtosis"])
+    index = 0
+    avg_skew = 0
+    for c in all_cols:
+        
+        skew = df.loc[:,[c]].skew().item()
+        kurto = df.loc[:,[c]].kurtosis().item()
+        avg_skew = avg_skew+skew
+        make_transform = make_transform.append({"Column":c,"Skew":skew,"Kurtosis":kurto},ignore_index=True)
+    return make_transform,avg_skew/len(all_cols)
+
+make_transform,avg_skew = check_skew(df, df.columns[0:-1])
+print(make_transform)
+print("Average Skew :",avg_skew)
+```
+
+```{python}
+# Average Skew is high and will impact the model overall performance.
+# It should be reduced and brought between -0.5 and +0.5
+```
+
+```{python}
+import math
+import scipy.stats as ss
+
+def remove_skew(DF,include = None, threshold = 0.2):
+    
+    transform_master = pd.DataFrame(columns=["column","delta","lambda","skew_old","skew_new"])
+    #Get list of column names that should be processed based on input parameters
+    if include is None and exclude is None:
+        colnames = DF.columns.values
+    elif include is not None:
+        colnames = include
+    else:
+        print('No columns to process!')
+    
+    #Helper function that checks if all values are positive
+    
+    def make_positive(series):
+        minimum = np.amin(series)
+        original = series[0]
+        #If minimum is negative, offset all values by a constant to move all values to minimum positive 
+        if minimum <= 0:
+            series = series + abs(minimum) + 0.001
+        delta = series[0]-original
+        return series,delta
+    
+    #Go through desired columns in DataFrame
+    
+    for col in colnames:
+        #Get column skewness
+        skew = DF[col].skew()  #
+        # If skewness is larger than threshold and positively skewed; If yes, apply appropriate transformation
+        # Prefered transformation - CoxBox Transformation
+        if abs(skew) > threshold and skew > 0:
+            skewType = 'positive'
+            #Make sure all values are positive
+            DF[col],delta = make_positive(DF[col])    #
+            DF[col],fitted_lambda = ss.boxcox(DF[col])   #
+            skew_new = DF[col].skew()
+        elif abs(skew) > threshold and skew < 0:
+            skewType = 'negative'
+            #Make sure all values are positive
+            DF[col],delta = make_positive(DF[col])
+            
+            DF[col],fitted_lambda = ss.boxcox(DF[col]) #
+            skew_new = DF[col].skew()
+        #print("appending...",col,delta,fitted_lambda,skew,skew_new)
+        
+        transform_master = transform_master.append({"column":col,"delta":delta,"lambda":fitted_lambda,
+                                                    "skew_old":skew,"skew_new":skew_new}
+                                                        ,ignore_index=True)
+    #print(transform_master)
+    return DF,transform_master
+
+
+df,transform_master = remove_skew(df,df.columns[0:-1])
+transform_master = transform_master.set_index("column")
+print(transform_master)
+print('Average Skew : ',np.mean(np.array(transform_master['skew_new'])))
+```
+
+```{python}
+df.head()
+```
+
+```{python}
+# Since there is a huge imbalance in the target, Using SMOTE to balance the target variable
+from imblearn.over_sampling import SMOTE
+features = df.drop(['Outcome'],axis=1)
+target = df['Outcome']
+
+smote = SMOTE()
+labels, outcome = smote.fit_resample(features, target)
+
+bal_df = pd.DataFrame(labels, columns=features.columns)
+bal_df['Outcome'] = outcome
+
+bal_df['Outcome'].value_counts().plot(kind='bar', title='Outcome');
+```
+
+```{python}
+from sklearn.model_selection import train_test_split as tts
+features = bal_df.drop(['Outcome'],axis=1)
+target = bal_df['Outcome']
+X_train, X_test, Y_train, Y_test = tts(features, target, test_size=0.2, stratify=target,random_state=71)
+X_train.shape, Y_test.shape
+```
+
+```{python}
+# Model 1 - Decision Trees
+from sklearn.model_selection import cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score,classification_report,precision_score,recall_score,f1_score,roc_auc_score
+
+dt = DecisionTreeClassifier(max_depth= 5, random_state=71)
+cv_scores = cross_val_score(dt, X_train, Y_train, cv=10)
+print("Average training scores for decision Trees :", np.mean(cv_scores))
+dt.fit(X_train,Y_train)
+# Checking Training scores
+print(classification_report(Y_train,dt.predict(X_train)))
+print("ROC AUC score",roc_auc_score(Y_train,dt.predict(X_train)))
+# Checking Test scores
+print(classification_report(Y_test,dt.predict(X_test)))
+print("ROC AUC score",roc_auc_score(Y_test,dt.predict(X_test)))
+```
+
+```{python}
+# Model 2 - Support Vector Machine - SVM
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+svm = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+cv_scores = cross_val_score(svm, X_train, Y_train, cv=10)
+print("Average training scores for SVM :", np.mean(cv_scores))
+svm.fit(X_train,Y_train)
+# Checking Training scores
+print(classification_report(Y_train,svm.predict(X_train)))
+print("ROC AUC score",roc_auc_score(Y_train,svm.predict(X_train)))
+# Checking Test scores
+print(classification_report(Y_test,svm.predict(X_test)))
+print("ROC AUC score",roc_auc_score(Y_test,svm.predict(X_test)))
+```
+
+```{python}
+# Model 3 - Random Forest 
+from sklearn.ensemble import RandomForestClassifier
+rf = RandomForestClassifier(max_depth=5, random_state=71)
+cv_scores = cross_val_score(rf, X_train, Y_train, cv=10)
+print("Average training scores for Random forest :", np.mean(cv_scores))
+rf.fit(X_train,Y_train)
+# Checking Training scores
+print(classification_report(Y_train,rf.predict(X_train)))
+print("ROC AUC score",roc_auc_score(Y_train,rf.predict(X_train)))
+# Checking Test scores
+print(classification_report(Y_test,rf.predict(X_test)))
+print("ROC AUC score",roc_auc_score(Y_test, rf.predict(X_test)))
+```
+
+```{python}
+# Model 4 - Logistic regression
+from sklearn.linear_model import LogisticRegression
+lr = LogisticRegression(max_iter=10000,random_state=71)
+cv_scores = cross_val_score(lr, X_train, Y_train, cv=10)
+print("Average training scores for Logistic Regression :", np.mean(cv_scores))
+lr.fit(X_train,Y_train)
+# Checking Training scores
+print(classification_report(Y_train,lr.predict(X_train)))
+print("ROC AUC score",roc_auc_score(Y_train,lr.predict(X_train)))
+# Checking Test scores
+print(classification_report(Y_test,lr.predict(X_test)))
+print("ROC AUC score",roc_auc_score(Y_test,lr.predict(X_test)))
+```
+
+```{python}
+# find best model, which is more important, recall or precision value- danger case
+# build knn model
+# find best model find features- add code to exisiting
+# fine tune best model - hyperparamter tuning
+# build final model
+```
+
+```{python}
+# Model 5 - Base model KNN 
+from sklearn.neighbors import KNeighborsClassifier
+cv_scores = []
+for k in range(1,100,1):
+    knn = KNeighborsClassifier(n_neighbors = k)
+    scores = cross_val_score(knn,X_train,Y_train,cv = 10,scoring ="accuracy")
+    cv_scores.append(scores.mean())
+print("Best Scores - index : {} score :{}".format(cv_scores.index(max(cv_scores)),max(cv_scores)))
+
+k = cv_scores.index(max(cv_scores))
+knn = KNeighborsClassifier(n_neighbors= k+1)
+cv_scores = cross_val_score(knn, X_train, Y_train, cv=10)
+print("Average training scores for Logistic Regression :", np.mean(cv_scores))
+knn.fit(X_train,Y_train)
+# Checking Training scores
+print(classification_report(Y_train,knn.predict(X_train)))
+print("ROC AUC score",roc_auc_score(Y_train,knn.predict(X_train)))
+# Checking Test scores
+print(classification_report(Y_test,knn.predict(X_test)))
+print("ROC AUC score",roc_auc_score(Y_test,knn.predict(X_test)))
+```
+
+ 
+
+
+ 1. For the use case, the important metrics to be used is Recall(Diabetic) because all the diabetic patients have to be diagnosed and failing to do this is a major fallback.
+ 2. Precision cannot be used as metric because even with high precision score, if some diabetic    patients are missed out then its a model drawback.
+ 3. Capturing all Diabetic people is the priority task here.
+ 4. As a secondary metric, ROC-AUC curve and F1 score will be used.
+
+```{python}
+
+```
+
+```{python active="", eval=FALSE}
+ a. Based on Recall, AUC-ROC score and F1 test scores the model performance is as :
+   Logistic Regression < KNN < SVM < Decision Tree < Random Forest
+ c. Final model for the use case - Random Forest
+```
+
+```{python}
+df.columns
+```
+
+```{python}
+# Random Forest is the selected final model
+# The current model is overfitted and has high bais -  Reduce the bias using Bagging 
+```
+
+```{python}
+# Comparing Standard Random Forest with Random Forest Bagged over 1000 iterations
+from sklearn.ensemble import BaggingClassifier
+comp_df = pd.DataFrame()
+train_acc, train_pres, train_recall, train_f1, train_roc = [], [], [], [],[]
+test_acc, test_pres, test_recall, test_f1, test_roc= [], [], [], [], []
+b_train_acc, b_train_pres, b_train_recall, b_train_f1, b_train_roc = [], [], [], [],[]
+b_test_acc, b_test_pres, b_test_recall, b_test_f1, b_test_roc= [], [], [], [], []
+
+for i in range(100):
+    rf = RandomForestClassifier(max_depth=5, random_state=i)
+    rf.fit(X_train, Y_train)
+    brf = BaggingClassifier(base_estimator=rf, random_state=i)
+    brf.fit(X_train, Y_train)
+    
+    comp_df.at[i,'train_acc'], comp_df.at[i,'test_acc'] = accuracy_score(Y_train, rf.predict(X_train)), accuracy_score(Y_test, rf.predict(X_test))
+    comp_df.at[i,'b_train_acc'], comp_df.at[i,'b_test_acc'] = accuracy_score(Y_train, brf.predict(X_train)), accuracy_score(Y_test, brf.predict(X_test))
+    comp_df.at[i,'train_pres'], comp_df.at[i,'test_pres'] = precision_score(Y_train, rf.predict(X_train)), precision_score(Y_test, rf.predict(X_test))
+    comp_df.at[i,'b_train_pres'], comp_df.at[i,'b_test_pres'] = precision_score(Y_train, brf.predict(X_train)), precision_score(Y_test, brf.predict(X_test))
+    comp_df.at[i,'train_recall'], comp_df.at[i,'test_recall'] = recall_score(Y_train, rf.predict(X_train)), recall_score(Y_test, rf.predict(X_test))
+    comp_df.at[i,'b_train_recall'], comp_df.at[i,'b_test_recall'] = recall_score(Y_train, brf.predict(X_train)), recall_score(Y_test, brf.predict(X_test))
+    comp_df.at[i,'train_roc'], comp_df.at[i,'test_roc'] = roc_auc_score(Y_train, rf.predict(X_train)), roc_auc_score(Y_test, rf.predict(X_test))
+    comp_df.at[i,'b_train_roc'], comp_df.at[i,'b_test_roc'] = roc_auc_score(Y_train, brf.predict(X_train)), roc_auc_score(Y_test, brf.predict(X_test))
+    comp_df.at[i,'train_f1'], comp_df.at[i,'test_f1'] = f1_score(Y_train, rf.predict(X_train)), f1_score(Y_test, rf.predict(X_test))
+    comp_df.at[i,'b_train_f1'], comp_df.at[i,'b_test_f1'] = f1_score(Y_train, brf.predict(X_train)), f1_score(Y_test, brf.predict(X_test))
+
+print(comp_df.head())
+```
+
+```{python}
+print("Test accuracy\nStandard Random Forest: {}\tBagged Random Forest: {} ".format(np.mean(comp_df['test_acc']),np.mean(comp_df['b_test_acc'])))
+print("Test Recall\nStandard Random Forest: {}\tBagged Random Forest: {} ".format(np.mean(comp_df['test_recall']),np.mean(comp_df['b_test_recall'])))
+print("Test F1\nStandard Random Forest: {}\tBagged Random Forest: {} ".format(np.mean(comp_df['test_f1']),np.mean(comp_df['b_test_f1'])))
+print("Test ROC-AUC\nStandard Random Forest: {}\tBagged Random Forest: {} ".format(np.mean(comp_df['test_roc']),np.mean(comp_df['b_test_roc'])))
+```
+
+```{python active="", eval=FALSE}
+There isnt much difference between Standard Random Forest and Bagged Random Forest,
+but since the scores are overfitted, Chosing Bagged Random Forest (May perform better after Hyper parameter Tuning)
+```
+
+```{python}
+from pprint import pprint
+brf = RandomForestClassifier()
+brf = BaggingClassifier(base_estimator=brf)
+print("All paramters available for tuning")
+pprint(brf.get_params())
+```
+
+```{python}
+# Choosing important features for tuning
+base_estimator__criterion = ['gini','entropy']
+base_estimator__max_depth = [None,5,7,10]
+base_estimator__min_samples_split = [2,5,10]
+base_estimator__min_samples_leaf = [1,3,5]
+base_estimator__max_features = [1.0,'sqrt','auto','log2',0.8]
+base_estimator__n_estimators = [50,100,150]
+
+grid = {'base_estimator__criterion': base_estimator__criterion,
+               'base_estimator__n_estimators':base_estimator__n_estimators,
+               'base_estimator__max_depth': base_estimator__max_depth,
+               'base_estimator__min_samples_split': base_estimator__min_samples_split,
+               'base_estimator__min_samples_leaf': base_estimator__min_samples_leaf,
+               'base_estimator__max_features': base_estimator__max_features
+       }
+print(grid)
+```
+
+```{python}
+# Performing Grid Search 
+from sklearn.model_selection import GridSearchCV
+grid_brf = GridSearchCV(brf, grid, cv = 3, verbose = 2, n_jobs = -1)
+grid_brf.fit(X_train, Y_train)
+```
+
+```{python}
+best_grid = grid_brf.best_estimator_
+print("Best parameters : ",best_grid)
+```
+
+```{python}
+final_brf = BaggingClassifier(base_estimator=RandomForestClassifier(bootstrap=True,
+                                                        ccp_alpha=0.0,
+                                                        class_weight=None,
+                                                        criterion='entropy',
+                                                        max_depth=7,
+                                                        max_features=1.0,
+                                                        max_leaf_nodes=None,
+                                                        max_samples=None,
+                                                        min_impurity_decrease=0.0,
+                                                        min_impurity_split=None,
+                                                        min_samples_leaf=3,
+                                                        min_samples_split=5,
+                                                        min_weight_fraction_leaf=0.0,
+                                                        n_estimators=150,
+                                                        n_jobs=None,
+                                                        oob_score=False,
+                                                        random_state=None,
+                                                        verbose=0,
+                                                        warm_start=False),
+                  bootstrap=True, bootstrap_features=False, max_features=1.0,
+                  max_samples=1.0, n_estimators=10, n_jobs=None,
+                  oob_score=False, random_state=None, verbose=0,
+                  warm_start=False)
+```
+
+```{python}
+import pickle
+from sklearn.model_selection import StratifiedKFold
+kfold = StratifiedKFold(n_splits=20, shuffle=True, random_state=1)
+# enumerate the splits and summarize the distributions
+all_fold = pd.DataFrame()
+i = 0
+for train_ix, test_ix in kfold.split(features, target):
+    X_train, X_test = features.iloc[train_ix], features.iloc[test_ix]
+    Y_train, Y_test = target.iloc[train_ix], target.iloc[test_ix]
+    final_brf.fit(X_train,Y_train)
+    all_fold.at[i,'Model'] = 'model'+ str(i)
+    all_fold.at[i,'train ac'] = accuracy_score(Y_train, final_brf.predict(X_train))
+    all_fold.at[i,'train pre'] = precision_score(Y_train, final_brf.predict(X_train))
+    all_fold.at[i,'train rec'] = recall_score(Y_train, final_brf.predict(X_train))
+    all_fold.at[i,'train f1'] = f1_score(Y_train, final_brf.predict(X_train))
+    all_fold.at[i,'train roc'] = roc_auc_score(Y_train, final_brf.predict(X_train))
+    all_fold.at[i,'test ac'] = accuracy_score(Y_test,final_brf.predict(X_test))
+    all_fold.at[i,'test pre'] = precision_score(Y_test,final_brf.predict(X_test))
+    all_fold.at[i,'test rec'] = recall_score(Y_test,final_brf.predict(X_test))
+    all_fold.at[i,'test f1'] = f1_score(Y_test,final_brf.predict(X_test))
+    all_fold.at[i,'test roc'] = roc_auc_score(Y_test,final_brf.predict(X_test))
+    f = 'models/model' + str(i) + '.pkl'
+    print(f)
+    pickle.dump(final_brf, open(f, 'wb'))
+    i = i+1
+all_fold
+```
+
+```{python}
+# Best model according to test scores
+m = all_fold.iloc[all_fold['test rec'].idxmax()]['Model']
+f = 'models/'+ str(m) +'.pkl'
+f = open(f,'rb')
+model = pickle.load(f)
+print(classification_report(Y_test,model.predict(X_test)))
+recall_score(Y_test,model.predict(X_test))
+```
+
+```{python}
+
+```
